@@ -1,0 +1,122 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Represents a ChatuWorld citizen with their stats and inventory.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "level": { "type": "integer" },
+        "xp": { "type": "integer" },
+        "chatus": { "type": "integer" },
+        "avatarParts": { "type": "array", "items": { "type": "string" } },
+        "badges": { "type": "array", "items": { "type": "string" } },
+        "clubId": { "type": "string" },
+        "dailyLoginLast": { "type": "string", "format": "date-time" },
+        "isPremium": { "type": "boolean" }
+      },
+      "required": ["uid", "level", "xp", "chatus"]
+    },
+    "Club": {
+      "title": "Club",
+      "description": "A group of users with shared funds and competitive goals.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "balance": { "type": "integer" },
+        "levelRequired": { "type": "integer" },
+        "memberCount": { "type": "integer" }
+      },
+      "required": ["id", "name", "ownerId", "balance"]
+    },
+    "MarketItem": {
+      "title": "Market Item",
+      "description": "A virtual asset (web, game, or avatar piece) for sale.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["web", "game", "avatar"] },
+        "creatorId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "price": { "type": "integer" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "commission": { "type": "number" }
+      },
+      "required": ["id", "type", "ownerId", "price"]
+    },
+    "Competition": {
+      "title": "Competition",
+      "description": "A scheduled event for users or clubs to compete.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string" },
+        "rewardPool": { "type": "integer" },
+        "endsAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "rewardPool"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "A message in a global, club, or private chat.",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "roomId": { "type": "string" }
+      },
+      "required": ["text", "senderId", "timestamp", "roomId"]
+    },
+    "CreatedProject": {
+      "title": "Created Project",
+      "description": "A web or game project created by AI.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["web", "game"] },
+        "description": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "type", "description", "creatorId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Player profile and stats."
+    },
+    "/clubs/{clubId}": {
+      "schema": "Club",
+      "description": "Club details and shared bank."
+    },
+    "/clubs/{clubId}/members/{memberId}": {
+      "schema": { "type": "object", "properties": { "uid": { "type": "string" }, "role": { "type": "string" } } },
+      "description": "Club membership roster."
+    },
+    "/market": {
+      "schema": "MarketItem",
+      "description": "Public marketplace items."
+    },
+    "/competitions": {
+      "schema": "Competition",
+      "description": "Active tournaments."
+    },
+    "/chats/{roomId}/messages": {
+      "schema": "ChatMessage",
+      "description": "Message history for a specific room."
+    },
+    "/projects/{projectId}": {
+      "schema": "CreatedProject",
+      "description": "AI-generated user projects."
+    }
+  }
+}
