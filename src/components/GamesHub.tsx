@@ -1,21 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Gamepad2, ArrowLeft, Coins, Rocket, Monitor, X, Code } from 'lucide-react';
+import { Gamepad2, ArrowLeft, Coins, Rocket, Monitor, X, Code, Sparkles } from 'lucide-react';
 import { useAuth } from '../lib/AuthProvider';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, increment, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import SnakeGame from './games/SnakeGame';
 
-interface CreatedProject {
+export interface CreatedProject {
   id: string;
   name: string;
   type: 'web' | 'game';
   description: string;
   creatorId: string;
+  ownerId?: string;
+  isForSale?: boolean;
+  price?: number;
   createdAt: any;
 }
 
-const GamesHub: React.FC = () => {
+interface GamesHubProps {
+  onImproveProject?: (project: CreatedProject) => void;
+}
+
+const GamesHub: React.FC<GamesHubProps> = ({ onImproveProject }) => {
   const { chatuUser } = useAuth();
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [projects, setProjects] = useState<CreatedProject[]>([]);
@@ -212,52 +219,245 @@ const GamesHub: React.FC = () => {
           ))}
         </div>
       </section>
-      {selectedProject && <ProjectModal project={selectedProject} onClose={() => setSelectedProject(null)} />}
+      {selectedProject && (
+        <ProjectModal 
+          project={selectedProject} 
+          onClose={() => setSelectedProject(null)} 
+          onImprove={onImproveProject}
+        />
+      )}
     </div>
   );
 };
 
-const ProjectModal = ({ project, onClose }: { project: CreatedProject, onClose: () => void }) => (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-    <motion.div 
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="glass-card max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col relative border-accent/20"
-    >
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent to-transparent" />
-      <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/5">
-        <div className="flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center text-accent`}>
-            {project.type === 'game' ? <Gamepad2 /> : <Monitor />}
+const ProjectModal = ({ project, onClose, onImprove }: { project: CreatedProject, onClose: () => void, onImprove?: (project: CreatedProject) => void }) => {
+  const [viewMode, setViewMode] = useState<'play' | 'code'>('play');
+  const [copied, setCopied] = useState(false);
+  const [isSelling, setIsSelling] = useState(false);
+  const [sellPrice, setSellPrice] = useState(100);
+  const { chatuUser } = useAuth();
+  const isOwner = chatuUser?.uid === (project.ownerId || project.creatorId);
+  const isCreator = chatuUser?.uid === project.creatorId;
+
+  // Extract HTML from potential markdown blocks
+  const extractHtml = (text: string) => {
+    const match = text.match(/```html\s+([\s\S]*?)\s+```/) || text.match(/<html[\s\S]*<\/html>/i);
+    if (match) return match[1] || match[0];
+    return text;
+  };
+
+  const htmlContent = extractHtml(project.description);
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(htmlContent);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSell = async () => {
+    if (!chatuUser || !isOwner) return;
+    try {
+      const projRef = doc(db, 'projects', project.id);
+      await updateDoc(projRef, {
+        isForSale: true,
+        price: sellPrice,
+        ownerId: chatuUser.uid // Ensure ownerId is set
+      });
+      setIsSelling(false);
+      alert(`Projecte llistat per ${sellPrice} Chatus!`);
+    } catch (e) {
+      console.error(e);
+      alert('Error llistant el projecte');
+    }
+  };
+
+  const handleCancelSale = async () => {
+    if (!chatuUser || !isOwner) return;
+    try {
+      const projRef = doc(db, 'projects', project.id);
+      await updateDoc(projRef, {
+        isForSale: false
+      });
+      alert('Venda cancel·lada');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleBuy = async () => {
+    if (!chatuUser || isOwner) return;
+    if (chatuUser.chatus < (project.price || 0)) {
+      alert('No tens prous Chatus!');
+      return;
+    }
+
+    try {
+      // 1. Pay seller
+      const sellerId = project.ownerId || project.creatorId;
+      const sellerRef = doc(db, 'users', sellerId);
+      await updateDoc(sellerRef, {
+        chatus: increment(project.price || 0)
+      });
+
+      // 2. Charge buyer
+      const buyerRef = doc(db, 'users', chatuUser.uid);
+      await updateDoc(buyerRef, {
+        chatus: increment(-(project.price || 0))
+      });
+
+      // 3. Transfer ownership
+      const projRef = doc(db, 'projects', project.id);
+      await updateDoc(projRef, {
+        ownerId: chatuUser.uid,
+        isForSale: false
+      });
+
+      alert('Projecte adquirit amb èxit!');
+      onClose();
+    } catch (e) {
+      console.error(e);
+      alert('Error en la transacció');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 lg:p-4 bg-black/95 backdrop-blur-md">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="glass-card w-full h-full lg:max-w-6xl lg:h-[90vh] overflow-hidden flex flex-col relative border-accent/20"
+      >
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent to-primary" />
+        
+        <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-black/40">
+          <div className="flex items-center gap-4">
+            <div className={`w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent`}>
+              {project.type === 'game' ? <Gamepad2 size={20} /> : <Monitor size={20} />}
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-white uppercase tracking-tighter leading-none">{project.name}</h3>
+              <p className="text-[10px] font-bold text-accent uppercase tracking-widest mt-1 opacity-70">
+                {project.type === 'game' ? 'Joc IA interactiu' : 'Web IA interactiva'}
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-2xl font-black text-white uppercase tracking-tighter">{project.name}</h3>
-            <p className="text-xs font-bold text-accent uppercase tracking-widest">{project.type === 'game' ? 'Joc Deployat' : 'Web Deployada'}</p>
+
+          <div className="flex items-center gap-2">
+            <div className="bg-white/5 p-1 rounded-xl flex">
+              <button 
+                onClick={() => setViewMode('play')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'play' ? 'bg-accent text-black shadow-lg shadow-accent/20' : 'text-slate-400 hover:text-white'}`}
+              >
+                Jugar
+              </button>
+              <button 
+                onClick={() => setViewMode('code')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'code' ? 'bg-accent text-black shadow-lg shadow-accent/20' : 'text-slate-400 hover:text-white'}`}
+              >
+                Codi
+              </button>
+            </div>
+            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-slate-400">
+              <X size={20} />
+            </button>
           </div>
         </div>
-        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-white">
-          <X size={24} />
-        </button>
-      </div>
-      <div className="flex-1 overflow-y-auto p-8 space-y-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Code size={16} className="text-accent" />
-          <h4 className="text-sm font-black text-white uppercase">Codi i Arquitectura</h4>
+
+        <div className="flex-1 bg-white flex flex-col overflow-hidden">
+          {viewMode === 'play' ? (
+            <iframe 
+              srcDoc={htmlContent}
+              title={project.name}
+              className="w-full h-full border-none bg-white"
+              sandbox="allow-scripts allow-modals allow-popups"
+            />
+          ) : (
+            <div className="flex-1 overflow-y-auto p-4 bg-slate-950">
+              <pre className="font-mono text-[11px] text-slate-300 leading-relaxed whitespace-pre-wrap">
+                {htmlContent}
+              </pre>
+            </div>
+          )}
         </div>
-        <div className="bg-black/40 p-8 rounded-2xl font-mono text-xs text-slate-300 leading-relaxed whitespace-pre-wrap border border-white/5 shadow-inner">
-          {project.description}
+
+        <div className="px-6 py-4 border-t border-white/5 bg-black/40 flex justify-between items-center gap-4">
+          <div className="hidden lg:flex items-center gap-4 text-slate-500">
+            <div className="flex items-center gap-2">
+              <Code size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-widest">Chatu-Forge v2.0</span>
+            </div>
+            {project.isForSale && (
+              <div className="flex items-center gap-1 text-accent animate-pulse">
+                <Coins size={12} />
+                <span className="text-[10px] font-black uppercase">En Venda: {project.price} CH</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 lg:flex-none flex gap-3">
+             {isOwner && (
+               <div className="flex gap-2">
+                 {isSelling ? (
+                   <div className="flex gap-2 bg-white/5 p-1 rounded-xl border border-white/10">
+                      <input 
+                        type="number" 
+                        value={sellPrice} 
+                        onChange={(e) => setSellPrice(Number(e.target.value))}
+                        className="w-20 bg-transparent text-white text-xs font-black px-2 outline-none"
+                      />
+                      <button onClick={handleSell} className="bg-accent text-black px-3 py-1.5 rounded-lg text-[9px] font-black uppercase">Confirmar Venda</button>
+                      <button onClick={() => setIsSelling(false)} className="text-slate-400 px-3 py-1.5 text-[9px] font-black uppercase">X</button>
+                   </div>
+                 ) : (
+                   <button 
+                    onClick={() => project.isForSale ? handleCancelSale() : setIsSelling(true)}
+                    className={`px-4 py-3 border font-black rounded-xl text-[10px] uppercase tracking-widest transition-all ${project.isForSale ? 'bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500/20' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'}`}
+                   >
+                     {project.isForSale ? 'Retirar de la Venda' : 'Vendre Projecte'}
+                   </button>
+                 )}
+               </div>
+             )}
+
+             {!isOwner && project.isForSale && (
+                <button 
+                  onClick={handleBuy}
+                  className="flex-1 lg:flex-none px-6 py-3 bg-accent text-black font-black rounded-xl text-xs uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-accent/20"
+                >
+                  <Coins size={14} /> Comprar per {project.price} CH
+                </button>
+             )}
+
+             {onImprove && isOwner && (
+               <button 
+                onClick={() => {
+                  onImprove(project);
+                  onClose();
+                }}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-accent to-primary text-black font-black rounded-xl text-xs uppercase tracking-widest hover:scale-105 transition-all flex items-center justify-center gap-2"
+              >
+                <Sparkles size={14} /> Millorar
+              </button>
+             )}
+            
+             <button 
+              onClick={copyCode}
+              className="px-4 py-3 bg-white/5 text-slate-400 border border-white/10 font-bold rounded-xl text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all"
+            >
+              {copied ? 'Copiat!' : 'Codi'}
+            </button>
+            
+            <button 
+              onClick={onClose}
+              className="px-6 py-3 bg-white/5 text-slate-400 font-bold rounded-xl text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all border border-white/10"
+            >
+              Tancar
+            </button>
+          </div>
         </div>
-      </div>
-      <div className="p-6 border-t border-white/5 bg-white/5 flex justify-end">
-        <button 
-          onClick={onClose}
-          className="px-8 py-3 bg-accent text-black font-black rounded-xl text-xs uppercase tracking-widest hover:brightness-110 transition-all"
-        >
-          Tancar Visualitzador
-        </button>
-      </div>
-    </motion.div>
-  </div>
-);
+      </motion.div>
+    </div>
+  );
+};
 
 export default GamesHub;

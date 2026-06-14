@@ -10,6 +10,7 @@ export interface ChatuUser {
   dailyLoginLast?: string;
   isPremium?: boolean;
   debt?: number;
+  claimedRewards?: number[];
 }
 
 export interface ChatuClub {

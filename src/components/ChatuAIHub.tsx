@@ -11,20 +11,39 @@ import {   Sparkles,
   Loader2
 } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { doc, updateDoc, increment, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, increment, collection, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { CreatedProject } from './GamesHub';
 
-const ChatuAIHub: React.FC = () => {
+interface ChatuAIHubProps {
+  projectToImprove?: CreatedProject | null;
+  onClearImprovement?: () => void;
+}
+
+const ChatuAIHub: React.FC<ChatuAIHubProps> = ({ projectToImprove, onClearImprovement }) => {
   const { chatuUser } = useAuth();
   const [prompt, setPrompt] = useState('');
-  const [name, setName] = useState('');
-  const [type, setType] = useState<'web' | 'game' | 'help'>('web');
+  const [name, setName] = useState(projectToImprove?.name || '');
+  const [type, setType] = useState<'web' | 'game' | 'help'>(projectToImprove?.type || 'web');
   const [loading, setLoading] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [createdProject, setCreatedProject] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (projectToImprove) {
+      setName(projectToImprove.name);
+      setType(projectToImprove.type);
+    } else {
+      setName('');
+      // setType('web'); // Keep current type as preference or reset
+    }
+  }, [projectToImprove]);
+
   const handleGenerate = async () => {
-    if (!chatuUser || chatuUser.chatus < 100) {
-      alert('Necessites 100 Chatus per crear un projecte oficial!');
+    // If improving, cost is 0. If new, cost is 100.
+    const cost = projectToImprove ? 0 : 100;
+    
+    if (!chatuUser || chatuUser.chatus < cost) {
+      alert(`Necessites ${cost} Chatus per aquesta operació!`);
       return;
     }
 
@@ -38,37 +57,57 @@ const ChatuAIHub: React.FC = () => {
     setCreatedProject(null);
 
     try {
-      const userRef = doc(db, 'users', chatuUser.uid);
-      await updateDoc(userRef, {
-        chatus: increment(-100),
-        xp: increment(250)
-      });
+      if (cost > 0) {
+        const userRef = doc(db, 'users', chatuUser.uid);
+        await updateDoc(userRef, {
+          chatus: increment(-cost),
+          xp: increment(250)
+        });
+      }
+
+      // Context for AI if improving
+      const fullPrompt = projectToImprove 
+        ? `Millora aquest projecte existent: "${projectToImprove.name}"\nCodi actual:\n${projectToImprove.description}\n\nNoves instruccions de l'usuari: "${prompt}"`
+        : prompt;
 
       const response = await fetch('/api/chatu/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, type, userId: chatuUser.uid })
+        body: JSON.stringify({ prompt: fullPrompt, type, userId: chatuUser.uid })
       });
       const data = await response.json();
       
       if (data.result) {
-        // Guardar a Firestore
-        const projectRef = await addDoc(collection(db, 'projects'), {
-          name: name,
-          type: type === 'help' ? 'web' : type,
-          description: data.result,
-          creatorId: chatuUser.uid,
-          createdAt: serverTimestamp()
-        });
+        if (projectToImprove) {
+          // Actualitzar existent
+          const projRef = doc(db, 'projects', projectToImprove.id);
+          await updateDoc(projRef, {
+            name: name,
+            description: data.result,
+            updatedAt: serverTimestamp()
+          });
+          setCreatedProject(projectToImprove.id);
+        } else {
+          // Guardar a Firestore nou
+          const projectRef = await addDoc(collection(db, 'projects'), {
+            name: name,
+            type: type === 'help' ? 'web' : type,
+            description: data.result,
+            creatorId: chatuUser.uid,
+            ownerId: chatuUser.uid,
+            createdAt: serverTimestamp()
+          });
+          setCreatedProject(projectRef.id);
+        }
         
         setAiResponse(data.result);
-        setCreatedProject(projectRef.id);
         setPrompt('');
         setName('');
+        if (onClearImprovement) onClearImprovement();
       }
     } catch (error) {
       console.error(error);
-      alert('Error creant el projecte');
+      alert('Error processant amb IA');
     } finally {
       setLoading(false);
     }
@@ -99,9 +138,17 @@ const ChatuAIHub: React.FC = () => {
         <div className="relative z-10 space-y-6">
           <div className="flex justify-between items-start">
             <div>
-              <span className="bg-primary px-3 py-1 rounded text-[10px] font-black uppercase tracking-tighter mb-2 inline-block">AI Powered Lab</span>
-              <h2 className="text-3xl font-black text-white">Què vols crear avui?</h2>
-              <p className="text-sm text-slate-400 max-w-md">La ChatuAI t'ajuda a generar webs, jocs i concursos en qüestió de segons.</p>
+              <span className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-tighter mb-2 inline-block ${projectToImprove ? 'bg-accent text-black' : 'bg-primary'}`}>
+                {projectToImprove ? 'Forge Upgrade Mode' : 'AI Powered Lab'}
+              </span>
+              <h2 className="text-3xl font-black text-white">
+                {projectToImprove ? `Millorant: ${projectToImprove.name}` : 'Què vols crear avui?'}
+              </h2>
+              <p className="text-sm text-slate-400 max-w-md">
+                {projectToImprove 
+                  ? 'Estàs reconstruint i optimitzant un projecte existent sense cost de Chatus.' 
+                  : 'La ChatuAI t\'ajuda a generar webs, jocs i concursos en qüestió de segons.'}
+              </p>
             </div>
             <div className="text-right">
                <p className="text-[10px] text-slate-500 uppercase font-bold">Consultes Gratis</p>
@@ -131,20 +178,32 @@ const ChatuAIHub: React.FC = () => {
             />
             <div className="flex justify-between items-center pt-4 border-t border-white/5">
                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-accent font-bold text-xs uppercase">
+                  <div className={`flex items-center gap-2 font-bold text-xs uppercase ${projectToImprove ? 'text-green-400' : 'text-accent'}`}>
                      <Coins size={14} />
-                     <span>Cost Creació: 100 Chatus</span>
+                     <span>{projectToImprove ? 'Cost Actualització: 0 Chatus (GRATIS)' : 'Cost Creació: 100 Chatus'}</span>
                   </div>
-                  <span className="text-[9px] text-slate-500 uppercase font-medium italic">Desenvolupament instantani garantit</span>
+                  <span className="text-[9px] text-slate-500 uppercase font-medium italic">
+                    {projectToImprove ? 'Evolució de codi optimitzada' : 'Desenvolupament instantani garantit'}
+                  </span>
                </div>
-               <button
-                  disabled={loading || !prompt}
-                  onClick={handleGenerate}
-                  className="px-6 py-3 bg-accent text-black font-bold rounded-xl flex items-center gap-2 hover:brightness-110 disabled:opacity-50 transition-all text-sm uppercase tracking-tight shadow-lg shadow-accent/20"
-                >
-                  {loading ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
-                  {loading ? 'Generant...' : 'Crear Projecte'}
-                </button>
+               <div className="flex gap-2">
+                 {projectToImprove && onClearImprovement && (
+                   <button
+                    onClick={onClearImprovement}
+                    className="px-4 py-3 bg-white/5 text-slate-400 font-bold rounded-xl hover:bg-white/10 transition-all text-xs uppercase"
+                   >
+                     Cancel·lar
+                   </button>
+                 )}
+                 <button
+                    disabled={loading || !prompt || (!name && !projectToImprove)}
+                    onClick={handleGenerate}
+                    className={`px-6 py-3 font-bold rounded-xl flex items-center gap-2 hover:brightness-110 disabled:opacity-50 transition-all text-sm uppercase tracking-tight shadow-lg ${projectToImprove ? 'bg-green-500 text-black shadow-green-500/20' : 'bg-accent text-black shadow-accent/20'}`}
+                  >
+                    {loading ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
+                    {loading ? 'Processant...' : projectToImprove ? 'Millorar Projecte' : 'Crear Projecte'}
+                  </button>
+               </div>
             </div>
           </div>
         </div>
@@ -158,18 +217,25 @@ const ChatuAIHub: React.FC = () => {
             className="glass-card p-8 border-accent/20 relative"
           >
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent to-transparent" />
-            <h4 className="text-accent font-black mb-6 flex items-center gap-2 uppercase tracking-tighter">
+            <h4 className="text-accent font-black mb-4 flex items-center gap-2 uppercase tracking-tighter">
               <Sparkles size={18} /> Projecte Desplegat amb Èxit!
             </h4>
-            <p className="text-sm text-slate-400 mb-4">El teu projecte ja està disponible a la secció de "Jocs i Webs". Aquí tens els detalls tècnics:</p>
-            <div className="bg-black/20 p-6 rounded-2xl font-mono text-xs text-slate-300 leading-relaxed whitespace-pre-wrap border border-white/5 mb-6">
-              {aiResponse}
+            <div className="text-center py-12 space-y-4">
+               <div className="w-20 h-20 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-accent/20">
+                  <Monitor size={40} className="text-accent" />
+               </div>
+               <p className="text-sm text-slate-400 max-w-sm mx-auto leading-relaxed">
+                  El teu projecte ha estat forjat i desplegat a la xarxa ChatuWorld. Ja pots gaudir de l'experiència interactiva sense veure el codi font.
+               </p>
+               <div className="text-accent font-black text-xs uppercase tracking-[0.2em] pt-4">
+                  Transmissió Finalitzada
+               </div>
             </div>
             <button 
               onClick={() => { setAiResponse(null); setCreatedProject(null); }}
-              className="w-full py-3 bg-white/5 text-slate-400 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all"
+              className="w-full py-4 bg-accent text-black rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-lg shadow-accent/20"
             >
-              Entès, tancar forja
+              Tancar Forja i Jugar
             </button>
           </motion.div>
         )}

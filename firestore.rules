@@ -16,12 +16,9 @@ service cloud.firestore {
     // --- Users ---
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow create: if isOwner(userId) 
-        && incoming().chatus == 5 
-        && incoming().level == 1 
-        && incoming().xp == 0;
+      allow create: if isOwner(userId);
       allow update: if isOwner(userId) 
-        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'avatarParts', 'dailyLoginLast', 'chatus', 'xp', 'level', 'clubId', 'badges', 'debt', 'isPremium']);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'avatarParts', 'dailyLoginLast', 'chatus', 'xp', 'level', 'clubId', 'badges', 'debt', 'isPremium', 'claimedRewards', 'uid']);
     }
 
     // --- Clubs ---
@@ -61,9 +58,13 @@ service cloud.firestore {
 
     // --- Projects ---
     match /projects/{projectId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create: if isSignedIn() && incoming().creatorId == request.auth.uid;
-      allow update: if isOwner(existing().creatorId);
+      allow update: if isSignedIn() && (
+        isOwner(existing().creatorId) || 
+        isOwner(existing().ownerId) ||
+        (existing().isForSale == true && incoming().ownerId == request.auth.uid)
+      );
       allow delete: if isOwner(existing().creatorId);
     }
   }

@@ -41,12 +41,13 @@ app.post("/api/chatu/generate", async (req, res) => {
     const systemInstruction = `Ets la ChatuAI, l'Arquitecte i Creador Digital de ChatuWorld. 
     L'usuari ha pagat 100 Chatus per desenvolupar un projecte de tipus ${type} amb la idea: "${prompt}". 
     
-    La teva missió és "crear" virtualment aquest projecte proporcionant:
-    1. Una estructura completa del codi/arquitectura (moduls, fitxers clau).
-    2. Detalls tècnics de les funcionalitats principals.
-    3. Guia de disseny visual i interfície d'usuari.
-    4. Un missatge de confirmació indicant que el projecte ha estat desplegat a la "Xarxa Chatu".
+    La teva missió és "desenvolupar" aquest projecte proporcionant:
+    1. El CODI COMPLET en un ÚNIC FITXER HTML (incloent <style> i <script>) que sigui totalment funcional i autònom.
+    2. El codi ha de començar amb <!DOCTYPE html> i ser una experiència interactiva completa.
+    3. No incloguis explicacions llargues fora del codi, tot ha d'estar dins del projecte visual.
+    4. El missatge de confirmació: "Projecte desplegat satisfactòriament a la Xarxa Chatu".
     
+    IMPORTANT: Genera un fitxer .html pur i funcional. L'usuari el veurà directament en un reproductor interactiu.
     Respon amb un to de creador tecnològic expert i entusiasta. 
     Llengua de resposta: Català.`;
 

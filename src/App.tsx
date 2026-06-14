@@ -21,12 +21,13 @@ import Dashboard from './components/Dashboard';
 import ChatuAIHub from './components/ChatuAIHub';
 import ClubsView from './components/ClubsView';
 import MarketplaceView from './components/MarketplaceView';
-import GamesHub from './components/GamesHub';
+import GamesHub, { CreatedProject } from './components/GamesHub';
 import GlobalChat from './components/GlobalChat';
 
 const AppContent: React.FC = () => {
   const { user, chatuUser, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [projectToImprove, setProjectToImprove] = useState<CreatedProject | null>(null);
 
   const handleLogin = () => signInWithPopup(auth, new GoogleAuthProvider());
   const handleLogout = () => signOut(auth);
@@ -169,10 +170,22 @@ const AppContent: React.FC = () => {
             transition={{ duration: 0.2 }}
           >
             {activeTab === 'dashboard' && <Dashboard />}
-            {activeTab === 'ai' && <ChatuAIHub />}
+            {activeTab === 'ai' && (
+              <ChatuAIHub 
+                projectToImprove={projectToImprove} 
+                onClearImprovement={() => setProjectToImprove(null)} 
+              />
+            )}
             {activeTab === 'clubs' && <ClubsView />}
             {activeTab === 'market' && <MarketplaceView />}
-            {activeTab === 'games' && <GamesHub />}
+            {activeTab === 'games' && (
+              <GamesHub 
+                onImproveProject={(project) => {
+                  setProjectToImprove(project);
+                  setActiveTab('ai');
+                }} 
+              />
+            )}
           </motion.div>
         </AnimatePresence>
       </main>

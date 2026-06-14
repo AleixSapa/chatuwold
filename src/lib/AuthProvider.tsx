@@ -37,6 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             avatarParts: ['basic_body', 'basic_head'],
             badges: ['Newcomer'],
             debt: 0,
+            claimedRewards: [],
           };
           try {
             await setDoc(userDocRef, newUser);
