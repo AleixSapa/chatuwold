@@ -8,7 +8,8 @@ import {   Sparkles,
   Gamepad, 
   HelpCircle,
   Coins,
-  Loader2
+  Loader2,
+  Monitor
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, increment, collection, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
@@ -95,6 +96,7 @@ const ChatuAIHub: React.FC<ChatuAIHubProps> = ({ projectToImprove, onClearImprov
             description: data.result,
             creatorId: chatuUser.uid,
             ownerId: chatuUser.uid,
+            views: 0,
             createdAt: serverTimestamp()
           });
           setCreatedProject(projectRef.id);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Gamepad2, ArrowLeft, Coins, Rocket, Monitor, X, Code, Sparkles } from 'lucide-react';
+import { Gamepad2, ArrowLeft, Coins, Rocket, Monitor, X, Code, Sparkles, Eye } from 'lucide-react';
 import { useAuth } from '../lib/AuthProvider';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, increment, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
@@ -15,6 +15,7 @@ export interface CreatedProject {
   ownerId?: string;
   isForSale?: boolean;
   price?: number;
+  views?: number;
   createdAt: any;
 }
 
@@ -58,8 +59,8 @@ const GamesHub: React.FC<GamesHubProps> = ({ onImproveProject }) => {
   ];
 
   const webs = [
-    { id: 'web1', name: 'Chatu Social', url: 'https://chatu.social', description: 'La nostra xarxa principal', reward: 5 },
-    { id: 'web2', name: 'Chatu Shop', url: 'https://shop.chatu.social', description: 'Botiga oficial de l\'ecosistema', reward: 5 },
+    { id: 'web1', name: 'Chatu Social', url: 'https://chatu.social', description: 'La nostra xarxa principal', reward: 2 },
+    { id: 'web2', name: 'Chatu Shop', url: 'https://shop.chatu.social', description: 'Botiga oficial de l\'ecosistema', reward: 2 },
   ];
 
   const handleVisitWeb = async (web: typeof webs[0]) => {
@@ -76,6 +77,18 @@ const GamesHub: React.FC<GamesHubProps> = ({ onImproveProject }) => {
       alert(`Has guanyat ${web.reward} Chatus per visitar ${web.name}!`);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleOpenProject = async (project: CreatedProject) => {
+    setSelectedProject(project);
+    try {
+      const projRef = doc(db, 'projects', project.id);
+      await updateDoc(projRef, {
+        views: increment(1)
+      });
+    } catch (e) {
+      console.error("Error incrementing views:", e);
     }
   };
 
@@ -165,14 +178,32 @@ const GamesHub: React.FC<GamesHubProps> = ({ onImproveProject }) => {
             <motion.div
               key={project.id}
               whileHover={{ y: -5 }}
-              className="glass-card p-6 flex flex-col justify-between space-y-6 group cursor-pointer border-white/10"
-              onClick={() => setSelectedProject(project)}
+              className={`glass-card p-6 flex flex-col justify-between space-y-6 group cursor-pointer border-white/10 ${chatuUser?.uid === (project.ownerId || project.creatorId) ? 'border-accent/40 shadow-lg shadow-accent/5' : ''}`}
+              onClick={() => handleOpenProject(project)}
             >
-              <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${project.type === 'game' ? 'from-cyan-500 to-blue-700' : 'from-indigo-500 to-purple-700'} flex items-center justify-center text-white shadow-lg`}>
-                {project.type === 'game' ? <Gamepad2 /> : <Monitor />}
+              <div className="flex justify-between items-start">
+                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${project.type === 'game' ? 'from-cyan-500 to-blue-700' : 'from-indigo-500 to-purple-700'} flex items-center justify-center text-white shadow-lg`}>
+                  {project.type === 'game' ? <Gamepad2 /> : <Monitor />}
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                   <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 bg-white/5 px-2 py-1 rounded-lg">
+                      <Eye size={12} />
+                      {project.views || 0}
+                   </div>
+                   {project.isForSale && (
+                     <div className="bg-accent/20 text-accent px-2 py-1 rounded-lg text-[9px] font-black uppercase flex items-center gap-1">
+                        <Coins size={10} /> {project.price}
+                     </div>
+                   )}
+                </div>
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white mb-1">{project.name}</h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-xl font-bold text-white leading-tight">{project.name}</h3>
+                  {chatuUser?.uid === (project.ownerId || project.creatorId) && (
+                    <span className="text-[8px] bg-accent text-black px-1.5 py-0.5 rounded font-black uppercase">Tu</span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-500 uppercase font-black">{project.type === 'game' ? 'Joc IA' : 'Web IA'}</p>
               </div>
               <button className="w-full py-3 bg-white/5 border border-white/10 rounded-xl font-black text-[10px] uppercase tracking-widest group-hover:bg-accent group-hover:text-black transition-all">
@@ -336,8 +367,10 @@ const ProjectModal = ({ project, onClose, onImprove }: { project: CreatedProject
             </div>
             <div>
               <h3 className="text-lg font-black text-white uppercase tracking-tighter leading-none">{project.name}</h3>
-              <p className="text-[10px] font-bold text-accent uppercase tracking-widest mt-1 opacity-70">
+              <p className="text-[10px] font-bold text-accent uppercase tracking-widest mt-1 opacity-70 flex items-center gap-1">
                 {project.type === 'game' ? 'Joc IA interactiu' : 'Web IA interactiva'}
+                <span className="text-slate-500 mx-1">•</span>
+                <Eye size={10} /> {project.views || 0} visites
               </p>
             </div>
           </div>

@@ -20,11 +20,33 @@ const Dashboard: React.FC = () => {
   const { chatuUser } = useAuth();
   const [claiming, setClaiming] = useState<number | null>(null);
 
+  React.useEffect(() => {
+    if (!chatuUser) return;
+    
+    const xpForNextLevel = 100 * chatuUser.level;
+    const checkLevelUp = async () => {
+      if (chatuUser.xp >= xpForNextLevel) {
+        try {
+          const userRef = doc(db, 'users', chatuUser.uid);
+          await updateDoc(userRef, {
+            level: increment(1),
+            xp: chatuUser.xp - xpForNextLevel // Carry over extra XP
+          });
+          console.log("¡Nivell Augmentat!");
+        } catch (e) {
+          console.error("Error al pujar de nivell:", e);
+        }
+      }
+    };
+    checkLevelUp();
+  }, [chatuUser?.xp, chatuUser?.level, chatuUser?.uid]);
+
   if (!chatuUser) return null;
 
   // Next level progress calculation
   const xpForNextLevel = 100 * chatuUser.level;
-  const progress = (chatuUser.xp / xpForNextLevel) * 100;
+  const rawProgress = (chatuUser.xp / xpForNextLevel) * 100;
+  const progress = Math.min(rawProgress, 100);
 
   const handleClaimReward = async (lvl: number, reward: number) => {
     if (claiming) return;
@@ -45,11 +67,11 @@ const Dashboard: React.FC = () => {
   };
 
   const rewards = [
-    { level: 1, amount: 50, label: 'Kit de Benvinguda' },
-    { level: 2, amount: 100, label: 'Bossa de Chatus' },
-    { level: 5, amount: 250, label: 'Cofre Novell' },
-    { level: 10, amount: 500, label: 'Mega Crèdit' },
-    { level: 20, amount: 1000, label: 'Boss Final' },
+    { level: 1, amount: 10, label: 'Kit de Benvinguda' },
+    { level: 2, amount: 25, label: 'Bossa de Chatus' },
+    { level: 5, amount: 50, label: 'Cofre Novell' },
+    { level: 10, amount: 150, label: 'Mega Crèdit' },
+    { level: 20, amount: 400, label: 'Boss Final' },
   ];
 
   return (
