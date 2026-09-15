@@ -36,15 +36,51 @@
       <button id="logoutButton" type="button" class="secondary">Tornar al login</button>
     </section>
 
-    <section class="card hidden" id="homeScreen">
-      <div class="logo">CW</div>
-      <h1 id="welcomeTitle">Benvingut/da!</h1>
-      <p class="subtitle">ChatuWold està desbloquejat.</p>
-      <div class="unlocked">✓ Tots dos heu acceptat</div>
-      <button id="homeLogoutButton" type="button" class="secondary">Sortir</button>
+    <section class="home hidden" id="homeScreen">
+      <header class="homeHeader">
+        <div class="brand">
+          <div class="miniLogo">CW</div>
+          <span>ChatuWold</span>
+        </div>
+        <button id="homeLogoutButton" type="button" class="logoutButton">Sortir</button>
+      </header>
+
+      <div class="hero">
+        <span class="eyebrow">ESPAI PRIVAT</span>
+        <h1 id="welcomeTitle">Benvingut/da!</h1>
+        <p>El vostre espai ja està desbloquejat. Tot està preparat per començar.</p>
+        <div class="onlineBadge"><span></span> Connexió activa</div>
+      </div>
+
+      <div class="homeGrid">
+        <article class="homeCard large">
+          <div class="cardIcon">♥</div>
+          <div>
+            <span class="cardLabel">CHATUWOLD</span>
+            <h2>El nostre espai</h2>
+            <p>Aquest és el punt de partida del vostre espai privat.</p>
+          </div>
+        </article>
+
+        <article class="homeCard">
+          <div class="cardIcon">✓</div>
+          <span class="cardLabel">ESTAT</span>
+          <h2>Desbloquejat</h2>
+          <p>Els dos usuaris han acceptat.</p>
+        </article>
+
+        <article class="homeCard">
+          <div class="cardIcon">+</div>
+          <span class="cardLabel">PROPERAMENT</span>
+          <h2>Més coses</h2>
+          <p>Aquí anirem afegint les funcions de ChatuWold.</p>
+        </article>
+      </div>
+
+      <footer>ChatuWold · Espai privat</footer>
     </section>
   </main>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/sql-wasm.js"></script>
-  <script src="script.js?v=4"></script>
+  <script src="script.js?v=5"></script>
 </body>
 </html>
