@@ -21,12 +21,10 @@ const otherDot = document.getElementById('otherDot');
 
 const DB_KEY = 'chatuwold_sqlite_database';
 const USER_KEY = 'chatuwold_username';
+const FIXED_USERS = { Aleix: '010914', Mat: 'Barça' };
 
 async function startDatabase() {
-  SQL = await initSqlJs({
-    locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/${file}`
-  });
-
+  SQL = await initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/${file}` });
   const saved = localStorage.getItem(DB_KEY);
   db = saved ? new SQL.Database(new Uint8Array(JSON.parse(saved))) : new SQL.Database();
 
@@ -35,18 +33,21 @@ async function startDatabase() {
     password_hash TEXT NOT NULL,
     accepted INTEGER NOT NULL DEFAULT 0
   )`);
-
   db.run(`CREATE TABLE IF NOT EXISTS app_state (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     unlocked INTEGER NOT NULL DEFAULT 0
   )`);
-  db.run(`INSERT OR IGNORE INTO app_state (id, unlocked) VALUES (1, 0)`);
+  db.run('INSERT OR IGNORE INTO app_state (id, unlocked) VALUES (1, 0)');
+
+  for (const [username, password] of Object.entries(FIXED_USERS)) {
+    const passwordHash = await hashPassword(password);
+    db.run('INSERT OR IGNORE INTO users (username, password_hash, accepted) VALUES (?, ?, 0)', [username, passwordHash]);
+  }
   saveDatabase();
 }
 
 function saveDatabase() {
-  const bytes = db.export();
-  localStorage.setItem(DB_KEY, JSON.stringify(Array.from(bytes)));
+  localStorage.setItem(DB_KEY, JSON.stringify(Array.from(db.export())));
 }
 
 async function hashPassword(password) {
@@ -69,17 +70,16 @@ function showScreen(screen) {
 
 function refreshAgreement() {
   if (!currentUser) return;
-  const result = db.exec('SELECT accepted FROM users');
+  const result = db.exec('SELECT accepted FROM users WHERE username IN (?, ?)', ['Aleix', 'Mat']);
   const users = result.length ? result[0].values : [];
   const acceptedCount = users.filter(row => Boolean(row[0])).length;
   const myAccepted = Boolean(getUser(currentUser).accepted);
-  const bothAccepted = acceptedCount >= 2;
 
   myName.textContent = currentUser;
   myDot.classList.toggle('waiting', !myAccepted);
   otherDot.classList.toggle('waiting', acceptedCount < 2);
 
-  if (bothAccepted) {
+  if (acceptedCount === 2) {
     db.run('UPDATE app_state SET unlocked = 1 WHERE id = 1');
     saveDatabase();
     welcomeTitle.textContent = `Benvingut/da, ${currentUser}!`;
@@ -87,9 +87,7 @@ function refreshAgreement() {
     return;
   }
 
-  agreementStatus.textContent = myAccepted
-    ? 'Has acceptat. Esperant l’altra persona…'
-    : 'Esperant la teva acceptació…';
+  agreementStatus.textContent = myAccepted ? 'Has acceptat. Esperant l’altra persona…' : 'Esperant la teva acceptació…';
   acceptButton.disabled = myAccepted;
   acceptButton.textContent = myAccepted ? 'Acceptat' : 'Acceptar';
 }
@@ -97,22 +95,20 @@ function refreshAgreement() {
 loginForm.addEventListener('submit', async event => {
   event.preventDefault();
   loginMessage.textContent = '';
-
   const username = usernameInput.value.trim();
   const password = passwordInput.value;
-  if (!username || !password) return;
+
+  if (!FIXED_USERS[username]) {
+    loginMessage.textContent = 'L’usuari ha de ser Aleix o Mat.';
+    return;
+  }
+  if (!password) return;
 
   const passwordHash = await hashPassword(password);
   const existing = getUser(username);
-
-  if (existing && existing.passwordHash !== passwordHash) {
+  if (!existing || existing.passwordHash !== passwordHash) {
     loginMessage.textContent = 'Usuari o contrasenya incorrectes.';
     return;
-  }
-
-  if (!existing) {
-    db.run('INSERT INTO users (username, password_hash, accepted) VALUES (?, ?, 0)', [username, passwordHash]);
-    saveDatabase();
   }
 
   currentUser = username;
@@ -143,7 +139,7 @@ homeLogoutButton.addEventListener('click', logout);
   try {
     await startDatabase();
     const remembered = localStorage.getItem(USER_KEY);
-    if (remembered) {
+    if (remembered && FIXED_USERS[remembered]) {
       usernameInput.value = remembered;
       rememberInput.checked = true;
     }
