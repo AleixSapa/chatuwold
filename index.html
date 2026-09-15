@@ -9,45 +9,42 @@
 <body>
   <main class="app">
     <section class="card" id="loginScreen">
+      <div class="logo">CW</div>
       <h1>ChatuWold</h1>
-      <p>Entra per començar.</p>
-
+      <p class="subtitle">El vostre espai privat.</p>
       <form id="loginForm">
         <label for="username">Usuari</label>
-        <input id="username" name="username" type="text" autocomplete="username" required>
-
+        <input id="username" type="text" autocomplete="username" required>
         <label for="password">Contrasenya</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" required>
-
-        <label class="remember">
-          <input id="remember" type="checkbox">
-          <span>Recorda'm</span>
-        </label>
-
+        <input id="password" type="password" autocomplete="current-password" required>
+        <label class="remember"><input id="remember" type="checkbox"><span>Recorda'm</span></label>
         <button type="submit">Entrar</button>
       </form>
-
       <p id="loginMessage" class="message" aria-live="polite"></p>
     </section>
 
     <section class="card hidden" id="agreementScreen">
-      <h1>Abans d'entrar...</h1>
-      <p>Les dues persones heu d'acceptar per desbloquejar ChatuWold.</p>
-
-      <div class="status" id="agreementStatus" aria-live="polite">
-        Esperant l'altra persona…
+      <div class="logo">CW</div>
+      <h1>Esteu preparats?</h1>
+      <p class="subtitle">Les dues persones heu d'acceptar abans d'entrar.</p>
+      <div class="people">
+        <div class="person"><span id="myDot" class="dot"></span><span id="myName">Tu</span></div>
+        <div class="person"><span id="otherDot" class="dot waiting"></span><span>Altra persona</span></div>
       </div>
-
+      <div id="agreementStatus" class="status">Esperant la teva acceptació…</div>
       <button id="acceptButton" type="button">Acceptar</button>
+      <button id="logoutButton" type="button" class="secondary">Sortir</button>
     </section>
 
     <section class="card hidden" id="homeScreen">
-      <h1 id="welcomeTitle">Benvingut/da a ChatuWold!</h1>
-      <p>La web està desbloquejada.</p>
-      <button id="logoutButton" type="button" class="secondary">Sortir</button>
+      <div class="logo">CW</div>
+      <h1 id="welcomeTitle">Benvingut/da!</h1>
+      <p class="subtitle">ChatuWold està desbloquejat.</p>
+      <div class="unlocked">✓ Tots dos heu acceptat</div>
+      <button id="homeLogoutButton" type="button" class="secondary">Sortir</button>
     </section>
   </main>
-
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/sql-wasm.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
