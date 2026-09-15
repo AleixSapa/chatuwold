@@ -63,38 +63,32 @@ function getUser(username) {
   return { username: name, passwordHash, accepted: Boolean(accepted) };
 }
 
+function bothApproved() {
+  const result = db.exec('SELECT accepted FROM users WHERE username IN (?, ?)', ['Aleix', 'Mat']);
+  const users = result.length ? result[0].values : [];
+  return users.length === 2 && users.every(row => Boolean(row[0]));
+}
+
 function showScreen(screen) {
   [loginScreen, agreementScreen, homeScreen].forEach(el => el.classList.add('hidden'));
   screen.classList.remove('hidden');
 }
 
-function refreshAgreement() {
-  if (!currentUser) return;
-  const result = db.exec('SELECT accepted FROM users WHERE username IN (?, ?)', ['Aleix', 'Mat']);
-  const users = result.length ? result[0].values : [];
-  const acceptedCount = users.filter(row => Boolean(row[0])).length;
-  const myAccepted = Boolean(getUser(currentUser).accepted);
+function openHome() {
+  db.run('UPDATE app_state SET unlocked = 1 WHERE id = 1');
+  saveDatabase();
+  welcomeTitle.textContent = `Benvingut/da, ${currentUser}!`;
+  showScreen(homeScreen);
+}
 
-  myName.textContent = currentUser;
-  myDot.classList.toggle('waiting', !myAccepted);
-  otherDot.classList.toggle('waiting', acceptedCount < 2);
-
-  if (acceptedCount === 2) {
-    db.run('UPDATE app_state SET unlocked = 1 WHERE id = 1');
-    saveDatabase();
-    welcomeTitle.textContent = `Benvingut/da, ${currentUser}!`;
-    showScreen(homeScreen);
-    return;
-  }
-
-  agreementStatus.textContent = myAccepted ? 'Has acceptat. Esperant l’altra persona…' : 'Esperant la teva acceptació…';
-  acceptButton.disabled = myAccepted;
-  acceptButton.textContent = myAccepted ? 'Acceptat' : 'Acceptar';
+function showPendingApproval() {
+  loginMessage.textContent = 'La teva confirmació ja s’ha enviat. Quan els dos ho hàgiu aprovat, podràs entrar.';
 }
 
 loginForm.addEventListener('submit', async event => {
   event.preventDefault();
   loginMessage.textContent = '';
+
   const username = usernameInput.value.trim();
   const password = passwordInput.value;
 
@@ -112,18 +106,39 @@ loginForm.addEventListener('submit', async event => {
   }
 
   currentUser = username;
+
+  if (bothApproved()) {
+    openHome();
+    return;
+  }
+
+  if (existing.accepted) {
+    showPendingApproval();
+    return;
+  }
+
   if (rememberInput.checked) localStorage.setItem(USER_KEY, username);
   else localStorage.removeItem(USER_KEY);
 
+  myName.textContent = currentUser;
+  agreementStatus.textContent = 'Cal que confirmis la teva entrada abans de continuar.';
+  myDot.classList.add('waiting');
+  otherDot.classList.add('waiting');
+  acceptButton.disabled = false;
+  acceptButton.textContent = 'Acceptar';
   showScreen(agreementScreen);
-  refreshAgreement();
 });
 
 acceptButton.addEventListener('click', () => {
   if (!currentUser) return;
+
   db.run('UPDATE users SET accepted = 1 WHERE username = ?', [currentUser]);
   saveDatabase();
-  refreshAgreement();
+
+  currentUser = null;
+  passwordInput.value = '';
+  showScreen(loginScreen);
+  loginMessage.textContent = 'S’ha enviat la confirmació de nou usuari. Torna a entrar quan els dos ho hàgiu aprovat.';
 });
 
 function logout() {
