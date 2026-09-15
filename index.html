@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatuWold</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <section class="card" id="loginScreen">
+      <h1>ChatuWold</h1>
+      <p>Entra per començar.</p>
+
+      <form id="loginForm">
+        <label for="username">Usuari</label>
+        <input id="username" name="username" type="text" autocomplete="username" required>
+
+        <label for="password">Contrasenya</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+        <label class="remember">
+          <input id="remember" type="checkbox">
+          <span>Recorda'm</span>
+        </label>
+
+        <button type="submit">Entrar</button>
+      </form>
+
+      <p id="loginMessage" class="message" aria-live="polite"></p>
+    </section>
+
+    <section class="card hidden" id="agreementScreen">
+      <h1>Abans d'entrar...</h1>
+      <p>Les dues persones heu d'acceptar per desbloquejar ChatuWold.</p>
+
+      <div class="status" id="agreementStatus" aria-live="polite">
+        Esperant l'altra persona…
+      </div>
+
+      <button id="acceptButton" type="button">Acceptar</button>
+    </section>
+
+    <section class="card hidden" id="homeScreen">
+      <h1 id="welcomeTitle">Benvingut/da a ChatuWold!</h1>
+      <p>La web està desbloquejada.</p>
+      <button id="logoutButton" type="button" class="secondary">Sortir</button>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
