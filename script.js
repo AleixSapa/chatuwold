@@ -1,3 +1,7 @@
+let db;
+let currentUser = null;
+let SQL;
+
 const loginScreen = document.getElementById('loginScreen');
 const agreementScreen = document.getElementById('agreementScreen');
 const homeScreen = document.getElementById('homeScreen');
@@ -9,55 +13,142 @@ const loginMessage = document.getElementById('loginMessage');
 const agreementStatus = document.getElementById('agreementStatus');
 const acceptButton = document.getElementById('acceptButton');
 const logoutButton = document.getElementById('logoutButton');
+const homeLogoutButton = document.getElementById('homeLogoutButton');
 const welcomeTitle = document.getElementById('welcomeTitle');
+const myName = document.getElementById('myName');
+const myDot = document.getElementById('myDot');
+const otherDot = document.getElementById('otherDot');
 
-const rememberedUsername = localStorage.getItem('chatuwold_username');
-if (rememberedUsername) {
-  usernameInput.value = rememberedUsername;
-  rememberInput.checked = true;
+const DB_KEY = 'chatuwold_sqlite_database';
+const USER_KEY = 'chatuwold_username';
+
+async function startDatabase() {
+  SQL = await initSqlJs({
+    locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/${file}`
+  });
+
+  const saved = localStorage.getItem(DB_KEY);
+  db = saved ? new SQL.Database(new Uint8Array(JSON.parse(saved))) : new SQL.Database();
+
+  db.run(`CREATE TABLE IF NOT EXISTS users (
+    username TEXT PRIMARY KEY,
+    password_hash TEXT NOT NULL,
+    accepted INTEGER NOT NULL DEFAULT 0
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS app_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    unlocked INTEGER NOT NULL DEFAULT 0
+  )`);
+  db.run(`INSERT OR IGNORE INTO app_state (id, unlocked) VALUES (1, 0)`);
+  saveDatabase();
+}
+
+function saveDatabase() {
+  const bytes = db.export();
+  localStorage.setItem(DB_KEY, JSON.stringify(Array.from(bytes)));
+}
+
+async function hashPassword(password) {
+  const data = new TextEncoder().encode(password);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash)).map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function getUser(username) {
+  const result = db.exec('SELECT username, password_hash, accepted FROM users WHERE username = ?', [username]);
+  if (!result.length || !result[0].values.length) return null;
+  const [name, passwordHash, accepted] = result[0].values[0];
+  return { username: name, passwordHash, accepted: Boolean(accepted) };
 }
 
 function showScreen(screen) {
-  [loginScreen, agreementScreen, homeScreen].forEach((element) => {
-    element.classList.add('hidden');
-  });
+  [loginScreen, agreementScreen, homeScreen].forEach(el => el.classList.add('hidden'));
   screen.classList.remove('hidden');
 }
 
-loginForm.addEventListener('submit', (event) => {
-  event.preventDefault();
+function refreshAgreement() {
+  if (!currentUser) return;
+  const result = db.exec('SELECT accepted FROM users');
+  const users = result.length ? result[0].values : [];
+  const acceptedCount = users.filter(row => Boolean(row[0])).length;
+  const myAccepted = Boolean(getUser(currentUser).accepted);
+  const bothAccepted = acceptedCount >= 2;
 
-  const username = usernameInput.value.trim();
-  const password = passwordInput.value;
+  myName.textContent = currentUser;
+  myDot.classList.toggle('waiting', !myAccepted);
+  otherDot.classList.toggle('waiting', acceptedCount < 2);
 
-  if (!username || !password) {
-    loginMessage.textContent = 'Omple tots els camps.';
+  if (bothAccepted) {
+    db.run('UPDATE app_state SET unlocked = 1 WHERE id = 1');
+    saveDatabase();
+    welcomeTitle.textContent = `Benvingut/da, ${currentUser}!`;
+    showScreen(homeScreen);
     return;
   }
 
-  if (rememberInput.checked) {
-    localStorage.setItem('chatuwold_username', username);
-  } else {
-    localStorage.removeItem('chatuwold_username');
+  agreementStatus.textContent = myAccepted
+    ? 'Has acceptat. Esperant l’altra persona…'
+    : 'Esperant la teva acceptació…';
+  acceptButton.disabled = myAccepted;
+  acceptButton.textContent = myAccepted ? 'Acceptat' : 'Acceptar';
+}
+
+loginForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  loginMessage.textContent = '';
+
+  const username = usernameInput.value.trim();
+  const password = passwordInput.value;
+  if (!username || !password) return;
+
+  const passwordHash = await hashPassword(password);
+  const existing = getUser(username);
+
+  if (existing && existing.passwordHash !== passwordHash) {
+    loginMessage.textContent = 'Usuari o contrasenya incorrectes.';
+    return;
   }
 
-  loginMessage.textContent = '';
+  if (!existing) {
+    db.run('INSERT INTO users (username, password_hash, accepted) VALUES (?, ?, 0)', [username, passwordHash]);
+    saveDatabase();
+  }
+
+  currentUser = username;
+  if (rememberInput.checked) localStorage.setItem(USER_KEY, username);
+  else localStorage.removeItem(USER_KEY);
+
   showScreen(agreementScreen);
+  refreshAgreement();
 });
 
 acceptButton.addEventListener('click', () => {
-  agreementStatus.textContent = 'Has acceptat. Esperant l’altra persona…';
-  acceptButton.disabled = true;
-  acceptButton.textContent = 'Acceptat';
-
-  // La sincronització real entre els dos dispositius s'afegirà amb backend.
+  if (!currentUser) return;
+  db.run('UPDATE users SET accepted = 1 WHERE username = ?', [currentUser]);
+  saveDatabase();
+  refreshAgreement();
 });
 
-logoutButton.addEventListener('click', () => {
+function logout() {
+  currentUser = null;
   passwordInput.value = '';
-  acceptButton.disabled = false;
-  acceptButton.textContent = 'Acceptar';
-  agreementStatus.textContent = 'Esperant l’altra persona…';
-  welcomeTitle.textContent = 'Benvingut/da a ChatuWold!';
   showScreen(loginScreen);
-});
+}
+
+logoutButton.addEventListener('click', logout);
+homeLogoutButton.addEventListener('click', logout);
+
+(async () => {
+  try {
+    await startDatabase();
+    const remembered = localStorage.getItem(USER_KEY);
+    if (remembered) {
+      usernameInput.value = remembered;
+      rememberInput.checked = true;
+    }
+  } catch (error) {
+    loginMessage.textContent = 'No s’ha pogut iniciar SQLite.';
+    console.error(error);
+  }
+})();
