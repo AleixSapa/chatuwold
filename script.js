@@ -85,40 +85,32 @@ function showPendingApproval() {
   loginMessage.textContent = 'La teva confirmació ja s’ha enviat. Quan els dos ho hàgiu aprovat, podràs entrar.';
 }
 
-loginForm.addEventListener('submit', async event => {
-  event.preventDefault();
+async function loginUser(username, password, isAutomatic = false) {
   loginMessage.textContent = '';
-
-  const username = usernameInput.value.trim();
-  const password = passwordInput.value;
 
   if (!FIXED_USERS[username]) {
     loginMessage.textContent = 'L’usuari ha de ser Aleix o Mat.';
-    return;
+    return false;
   }
-  if (!password) return;
 
   const passwordHash = await hashPassword(password);
   const existing = getUser(username);
   if (!existing || existing.passwordHash !== passwordHash) {
-    loginMessage.textContent = 'Usuari o contrasenya incorrectes.';
-    return;
+    if (!isAutomatic) loginMessage.textContent = 'Usuari o contrasenya incorrectes.';
+    return false;
   }
 
   currentUser = username;
 
   if (bothApproved()) {
     openHome();
-    return;
+    return true;
   }
 
   if (existing.accepted) {
     showPendingApproval();
-    return;
+    return true;
   }
-
-  if (rememberInput.checked) localStorage.setItem(USER_KEY, username);
-  else localStorage.removeItem(USER_KEY);
 
   myName.textContent = currentUser;
   agreementStatus.textContent = 'Cal que confirmis la teva entrada abans de continuar.';
@@ -127,6 +119,19 @@ loginForm.addEventListener('submit', async event => {
   acceptButton.disabled = false;
   acceptButton.textContent = 'Acceptar';
   showScreen(agreementScreen);
+  return true;
+}
+
+loginForm.addEventListener('submit', async event => {
+  event.preventDefault();
+
+  const username = usernameInput.value.trim();
+  const password = passwordInput.value;
+
+  if (rememberInput.checked) localStorage.setItem(USER_KEY, username);
+  else localStorage.removeItem(USER_KEY);
+
+  await loginUser(username, password);
 });
 
 acceptButton.addEventListener('click', () => {
@@ -144,6 +149,8 @@ acceptButton.addEventListener('click', () => {
 function logout() {
   currentUser = null;
   passwordInput.value = '';
+  localStorage.removeItem(USER_KEY);
+  rememberInput.checked = false;
   showScreen(loginScreen);
 }
 
@@ -154,9 +161,11 @@ homeLogoutButton.addEventListener('click', logout);
   try {
     await startDatabase();
     const remembered = localStorage.getItem(USER_KEY);
+
     if (remembered && FIXED_USERS[remembered]) {
       usernameInput.value = remembered;
       rememberInput.checked = true;
+      await loginUser(remembered, FIXED_USERS[remembered], true);
     }
   } catch (error) {
     loginMessage.textContent = 'No s’ha pogut iniciar SQLite.';
