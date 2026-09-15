@@ -1,6 +1,0 @@
-{
-  "name": "ChatuWorld",
-  "description": "A futuristic gaming ecosystem featuring social clubs, a virtual economy, AI-powered web and game creation, and competitive tournaments.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
